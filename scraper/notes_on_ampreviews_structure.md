@@ -232,3 +232,9 @@ https://www.ampreviews.net/index.php?threads/boston.13753/
 https://www.ampreviews.net/index.php?threads/boston.13753/page-2
 
 ---
+
+
+
+https://stackoverflow.com/questions/52464727/can-i-use-scrapy-without-the-calling-a-spider
+
+https://medium.com/@TeraCrawler.io/how-to-run-scrapy-as-a-standalone-script-ee4a3981906c

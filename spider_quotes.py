@@ -12,9 +12,10 @@ logging.basicConfig(
 
 
 class QuotesSpider(CrawlSpider):
+    cities = []
     name = 'quotes'
     allowed_domains = ['quotes.toscrape.com/tag/friendship/']
-    #start_urls = ['https://quotes.toscrape.com/tag/friendship/']
+    #start_urls = ['https://quotes.toscrape.com/tag/friendship/'] # DOES NOT WORK 
 
     def start_requests(self):
         urls = ['https://quotes.toscrape.com/tag/friendship/']
@@ -30,10 +31,10 @@ class QuotesSpider(CrawlSpider):
                 'text': text 
                 }
 
-        next_page = response.css('li.next a::attr(href)').get()
-        if next_page is not None:
-            next_page = response.urljoin(next_page)
-            yield scrapy.Request(next_page, callback=self.parse)
+        #next_page = response.css('li.next a::attr(href)').get()
+        #if next_page is not None:
+            #next_page = response.urljoin(next_page)
+            #yield scrapy.Request(next_page, callback=self.parse)
 
 c = CrawlerProcess(
     settings={

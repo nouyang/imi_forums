@@ -17,38 +17,46 @@ from scrapy.crawler import CrawlerProcess
     #num_messages = scrapy.Field()
 
 
+# TODO 2/1/2023: Don't duplicate cities
 class AmpRevSpider(CrawlSpider):
     name = 'extract_cities'
     start_urls = ['https://ampreviews.net/index.php']
     #allowed_domains = 'https://ampreviews.net/index.php'
-    base_url = 'https://ampreviews.net/index.php'
 
     def start_requests(self):
-        url = 'https://ampreviews.net/index.php?'
-        self.logger.error('Parse function called on %s', url)
+        self.cities = set()
+        self.base_url = 'https://ampreviews.net'
+
+        url = 'https://ampreviews.net/index.php'
+        self.logger.error(f'starting with url {url}')
         yield scrapy.Request(url=url, callback=self.parse_item)
 
-
+            #self.logger.error('found link %s', category_link)
     def parse_item(self, response):
         for category in response.css("div.node-main"):
-
             category_link = category.css("a::attr(href)").extract_first() 
-            #self.logger.error('found link %s', category_link)
 
             if 'reviews-' in category_link or 'discussion-' in category_link:
                 num_threads, num_msgs = category.css("dd::text").extract()
+                title = category.css("a::text").get()
+                city = title.split(' - ')[-1]
+
+                self.logger.info(f'Got city: {city}, from link: {category_link}')
+                self.cities.add(city)
 
                 yield{
-                'title': category.css("a::text").extract_first(),
-                'link': category_link,
-                'num_threads':   num_threads,
-                'num_messages': num_msgs
+                    #'cities': self.cities,
+                    'city': city,
+                    'title': title,
+                    'link': category_link,
+                    'num_threads':   num_threads,
+                    'num_messages': num_msgs
                 }
+                self.logger.debug(f'List of cities so far: {self.cities}')
 
             elif 'categories' in category_link:
                 constructed_url = self.base_url + category_link
-                #response.urljoin(category_link.extract_first())
-                self.logger.info('!-- Recursing down')
+                self.logger.info(f'!-- Recursing down to {constructed_url}')
                 yield scrapy.Request(url=constructed_url, callback=self.parse_item)
             
     #custom_settings = {'FEED_URI': '/Desktop/bbdata.csv','ITEM_PIPELINES':{'bb.pipelines.BBPipeline':300},'FEED_FORMAT':'csv'}
@@ -56,7 +64,7 @@ class AmpRevSpider(CrawlSpider):
 c = CrawlerProcess(
     settings={
         "FEEDS":{
-            "forum.csv" : {"format" : "csv",
+            "_raw_forum.csv" : {"format" : "csv",
                                 "overwrite":True,
                                 "encoding": "utf8",
                             }},
