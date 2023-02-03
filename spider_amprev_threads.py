@@ -15,9 +15,8 @@ import pandas as pd
 class ThreadSpider(CrawlSpider):
     name = 'extract_threads'
 
-
-
     def start_requests(self):
+        self.cities_crawled = set()
         self.base_url = 'https://ampreviews.net'
         data = pd.read_csv('_raw_forum.csv')
 
@@ -28,10 +27,12 @@ class ThreadSpider(CrawlSpider):
         #self.logger.error('found link %s', category_link)
 
     def parse_page(self, response):
-        page_url = response.url 
-        page_name = response.css('title::text').get()
-        # dirty hack to insert "comment" into top of csv file
-  
+        category_text = response.css('.p-title-value::text').get() # e.g. Discussion-Dallas
+        self.cities_crawled.add(category_text.split(' - ')[-1]) # e.g. Dallas 
+        #self.state['cities_crawled'] = self.cities_crawled
+
+        page_name = response.css('title::text').get() # e.g. Discussion-Dallas | Page 2 | AMPReviews
+        page_url = response.url  
 
         for thread in response.css('div.structItem--thread'):
             title = thread.css('div.structItem-title a::text').get()
@@ -63,13 +64,15 @@ class ThreadSpider(CrawlSpider):
                 'latest_author_url':latest_author_url ,
                 'posted_date_data': posted_date_data,
                 'latest_date_data': latest_date_data ,
+                'comment': category_text,
             }
 
             yield scraped
 
-        yield{
-            'title':page_name, 
-            'link':page_url,
+        # dirty hack to insert "comment" into bottom of csv file
+        # which contains the current page and url, just in case
+        yield {
+            'comment':page_name + ' ' +  page_url
         }
 
     # def followNext(self, response):
@@ -88,6 +91,8 @@ c = CrawlerProcess(
                             }},
         "DOWNLOAD_DELAY": 4,
         "DEPTH_LIMIT¶":2,
+        #"JOBDIR":'crawls/amprev_threads'
+
     }
 )
     #'USER_AGENT': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36',
