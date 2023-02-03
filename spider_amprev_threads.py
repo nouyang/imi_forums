@@ -21,51 +21,68 @@ class ThreadSpider(CrawlSpider):
         self.base_url = 'https://ampreviews.net'
         data = pd.read_csv('_raw_forum.csv')
 
-        for category_url in data.link:
-            url = category_url
-            self.logger.error(f'now working with url {url}')
-            yield scrapy.Request(url=url, callback=self.parse_item)
-            #self.logger.error('found link %s', category_link)
+        # for category_url in data.link:
+        category_url = 'https://ampreviews.net/index.php?forums/discussion-dallas.14/page-2' 
+        self.logger.error(f'now working with url {category_url}')
+        yield scrapy.Request(url=category_url, callback=self.parse_page)
+        #self.logger.error('found link %s', category_link)
 
-    def parse_item(self, response):
+    def parse_page(self, response):
+        page_url = response.url 
+        page_name = response.css('title::text').get()
+        # dirty hack to insert "comment" into top of csv file
+  
+
         for thread in response.css('div.structItem--thread'):
-            title = thread.css('div.structItem-title a::attr(href)')
-            link = thread.css('div.structItem-title a::text')
+            title = thread.css('div.structItem-title a::text').get()
+            link = thread.css('div.structItem-title a::attr(href)').get()
+            num_replies, num_views = thread.css('dd::text').extract()
+
             author, latest_author = thread.css('a.username::text').extract()
             author_url, latest_author_url = thread.css('a.username::attr(href)').extract()
+
             posted_date_readable, latest_date_readable =  thread.css('time::attr(title)').extract()
             posted_date_data, latest_date_data =  thread.css('time::attr(data-time)').extract()
-            num_replies, num_views = thread.css('dd::text').extract()
-            response.
+
+            # TODO: maybe refactor using first-child and second-child?
+            # thread.css('dl:first-child dd').extract()
 
             scraped = {
-                'category_title':
-                'post_title':title, 
-                'post_link':link,
+                'title':title, 
+                'num_replies': num_replies,
+                'num_views': num_views, 
+                'posted_date_readable': posted_date_readable, # Jan 23, 2003 at 6PM
+
                 'author':author, 
+
                 'latest_author':latest_author,
+                'latest_date_readable': latest_date_readable , # e.g. 12345006
+
+                'link':link,
                 'author_url':author_url,
                 'latest_author_url':latest_author_url ,
-                'posted_date_readable': posted_date_readable, # Jan 23, 2003 at 6PM
-                'latest_date_readable': latest_date_readable , # e.g. 12345006
                 'posted_date_data': posted_date_data,
                 'latest_date_data': latest_date_data ,
-                'num_replies': num_replies,
-                'num_views': num_views 
             }
+
             yield scraped
 
-    def followNext(self, response):
-        next_page = response.css('a.pageNav-jump--next::attr(href)').get()
-        if next_page is not None:
-            next_page = response.urljoin(next_page)
-            self.logger.error(f'going to next page: {next_page}')
-            yield scrapy.Request(next_page, callback=self.parse)
+        yield{
+            'title':page_name, 
+            'link':page_url,
+        }
+
+    # def followNext(self, response):
+    #     next_page = response.css('a.pageNav-jump--next::attr(href)').get()
+    #     if next_page is not None:
+    #         next_page = response.urljoin(next_page)
+    #         self.logger.error(f'going to next page: {next_page}')
+    #         yield scrapy.Request(next_page, callback=self.parse)
 
 c = CrawlerProcess(
     settings={
         "FEEDS":{
-            "_raw_forum.csv" : {"format" : "csv",
+            "_tmp_threads.csv" : {"format" : "csv",
                                 "overwrite":True,
                                 "encoding": "utf8",
                             }},
