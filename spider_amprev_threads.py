@@ -6,6 +6,10 @@ from scrapy.utils.log import configure_logging
 
 import numpy as np
 import pandas as pd
+# NOTE: if running into struct error needs unpack 4 bytes,
+# remove the job dir (cralws/amprev); make sure to stop scrapy with a
+# single ctrl-c, which will take 'download-delay' seconds to take effect
+
 # self.logger.info("Visited %s", response.url)
 
 # for a given category 
@@ -14,17 +18,20 @@ import pandas as pd
 # https://ampreviews.net/index.php?threads/lin-spa-brownsville-rd.133397/
 
 class ThreadSpider(CrawlSpider):
-    configure_logging(install_root_handler=False)
-    logging.basicConfig(
-        filename='log.txt',
-        format='[%(asctime)s] %(levelname)s: %(message)s',
-        datefmt='%d/%b/%Y %H:%M:%S',
-        level=logging.info
-    )
     name = 'extract_threads'
 
-    def start_requests(self):
+    def __init__(self):
         self.cities_crawled = set()
+
+        configure_logging(install_root_handler=False)
+        logging.basicConfig(
+            filename='log.txt',
+            format='[%(asctime)s] %(levelname)s: %(message)s',
+            datefmt='%d/%b/%Y %H:%M:%S',
+            #level=logging.INFO # TODO:debug, has no effect 
+        )
+
+    def start_requests(self):
         self.base_url = 'https://ampreviews.net'
         forum_data = pd.read_csv('_raw_forum.csv')
         #forum_data = pd.read_csv('_tmp_forum.csv')
@@ -105,8 +112,8 @@ c = CrawlerProcess(
         "CONCURRENT_REQUESTS":1, # default 16
         "CONCURRENT_REQUESTS_PER_DOMAIN":1, # default 8 
         "CONCURRENT_ITEMS":1, # DEFAULT 100
-        "DOWNLOAD_DELAY": 10, # default 0
-        "DEPTH_LIMIT":1,
+        "DOWNLOAD_DELAY": 15, # default 0
+        #"DEPTH_LIMIT":1,
         "JOBDIR":'crawls/amprev_threads',
         "DUPEFILTER_DEBUG":True,
     }
