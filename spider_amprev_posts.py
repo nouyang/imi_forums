@@ -6,6 +6,7 @@ from scrapy.utils.log import configure_logging
 
 import numpy as np
 import pandas as pd
+import time
 # self.logger.info("Visited %s", response.url)
 
 # for a given category 
@@ -25,15 +26,33 @@ class PostSpider(CrawlSpider):
 
     def start_requests(self):
         self.base_url = 'https://ampreviews.net'
-        forum_data = pd.read_csv('bkup_data/_raw_forum.csv')
+        forum_data = pd.read_csv('bkup_data/_raw_forum_discussions.csv')
 
         #post_url = '/index.php?threads/building-a-list-of-he-only-spots-in-manhattan.129971/' 
         #url = self.base_url + post_url 
+        self.logger.error(f'STarting spider')
         for category_url in forum_data.link:
             url = self.base_url + category_url
-            self.logger.error(f'now working with url {url}')
+            #self.logger.error(f'now working with url {url}')
+            self.logger.error(f'Yielding CATEGORY url {url}')
+            yield scrapy.Request(url=url, callback=self.parse_categ_page)
 
+    def parse_categ_page(self, response):
+        time.sleep(5)
+        self.logger.error(f'now parsing category {response.url}')
+        for thread in response.css('div.structItem--thread'):
+            link = thread.css('div.structItem-title a::attr(href)').get()
+            url = self.base_url + link
+            #yield { 
+            #    'thread': thread,
+            #    'url': url
+            #    }
+            self.logger.error(f'Yielding PAGE url {url}')
+            yield scrapy.Request(url=url, callback=self.parse_page)
+    
     def parse_page(self, response):
+        time.sleep(5)
+        self.logger.error(f'Parsing url {response.url}')
         page_name_and_pagination = response.css('title::text').get() # e.g. Discussion-Dallas | Page 2 | AMPReviews
         max_pages = response.css('li.pageNav-page:last-child a::text').get()
         page_url = response.url  
@@ -129,21 +148,19 @@ class PostSpider(CrawlSpider):
                 join_date_data
 
                 posted_date_data 
-
-            '''.split()
-            _ = '''
                 post_text
                 quoted_contents
-            '''
+            '''.split()
+            #_ = '''
+            #    post_text
+            #    quoted_contents
+            #'''
 
-            #fields = '''
-                #post_id
-            #'''.split()
-            #fields = set(fields) # prevent dup key error
-            self.logger.debug(fields)
 
+            #fields = set(fields) # prevent dup key error, but will reorder csv
+            #self.logger.debug(fields)
             # page_data = {key: loc[key] for key in loc.keys() if key in fields}
-            # retain ordering
+            # that will not retain ordering so instead:
             page_data = {}
             for key in fields:
                 page_data[key] = loc[key] 
@@ -157,26 +174,30 @@ class PostSpider(CrawlSpider):
             'comment': f'{page_name_and_pagination} -- {page_url} -- TotalPages {max_pages}'
         }
 
-        next_page = response.css('a.pageNav-jump--next::attr(href)').get()
-        if next_page is not None:
-            next_page = response.urljoin(next_page)
-            self.logger.info(f'going to next page: {next_page}')
-            yield scrapy.Request(next_page, callback=self.parse_page)
+        if False:
+            next_page = response.css('a.pageNav-jump--next::attr(href)').get()
+            if next_page is not None:
+                next_page = response.urljoin(next_page)
+                self.logger.info(f'going to next page: {next_page}')
+                yield scrapy.Request(next_page, callback=self.parse_page)
 
 c = CrawlerProcess(
     settings={
         "FEEDS":{
-            "_tmp_posts.csv" : {"format" : "csv",
+            "_tmp__FIRSTPAGEURLS.csv" : {"format" : "csv",
                                 "overwrite":True,
                                 "encoding": "utf8",
                             }},
         "CONCURRENT_REQUESTS":1, # default 16
         "CONCURRENT_REQUESTS_PER_DOMAIN":1, # default 8 
         "CONCURRENT_ITEMS":1, # DEFAULT 100
-        "DOWNLOAD_DELAY": 3, # default 0
+        "DOWNLOAD_DELAY": 1, # default 0
         "DEPTH_LIMIT":1,
-        #"JOBDIR":'crawls/amprev_posts',
-        #"DUPEFILTER_DEBUG":True,
+        #"AUTOTHROTTLE_ENABLED": True,
+        #"AUTOTHROTTLE_START_DELAY": 1,
+        #"AUTOTHROTTLE_MAX_DELAY": 3
+        "JOBDIR":'crawls/amprev_posts',
+        "DUPEFILTER_DEBUG":True,
     }
 )
 
