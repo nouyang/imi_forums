@@ -24,48 +24,58 @@ class PostSpider(CrawlSpider):
     )
     name = 'extract_posts'
 
+    def make_list_urls(self):
+        posts_data = pd.read_csv('_raw_forum.csv')
+
     def start_requests(self):
         self.base_url = 'https://ampreviews.net'
-        forum_data = pd.read_csv('bkup_data/_raw_forum_discussions.csv')
+        urls_list = self.make_list_urls()
 
-        #post_url = '/index.php?threads/building-a-list-of-he-only-spots-in-manhattan.129971/' 
-        #url = self.base_url + post_url 
-        self.logger.error('Starting spider')
-        for category_url in forum_data.link:
-            url = self.base_url + category_url
-            #self.logger.error(f'now working with url {url}')
-            self.logger.error(f'Yielding CATEGORY url {url}')
-            yield scrapy.Request(url=url, callback=self.parse_categ_page)
-
-    def parse_categ_page(self, response):
-        time.sleep(6)
-        self.logger.error(f'now parsing category {response.url}')
-        for thread in response.css('div.structItem--thread'):
-            link = thread.css('div.structItem-title a::attr(href)').get()
-            url = self.base_url + link
-            #yield { 
-            #    'thread': thread,
-            #    'url': url
-            #    }
-            self.logger.error(f'Yielding PAGE url {url}')
+        for url in urls_list:
+            url = self.base_url + urls_list 
+            self.logger.error(f'now working with url {url}')
             yield scrapy.Request(url=url, callback=self.parse_page)
-    
+
+        if False:
+            forum_data = pd.read_csv('bkup_data/_raw_forum_discussions.csv')
+            self.logger.error('Starting spider')
+            for category_url in forum_data.link:
+                url = self.base_url + category_url
+                #self.logger.error(f'now working with url {url}')
+                self.logger.error(f'Yielding CATEGORY url {url}')
+                yield scrapy.Request(url=url, callback=self.parse_categ_page)
+
+    if False:
+        def parse_categ_page(self, response):
+            time.sleep(6)
+            self.logger.error(f'now parsing category {response.url}')
+            for thread in response.css('div.structItem--thread'):
+                link = thread.css('div.structItem-title a::attr(href)').get()
+                url = self.base_url + link
+                #yield { 
+                #    'thread': thread,
+                #    'url': url
+                #    }
+                self.logger.error(f'Yielding PAGE url {url}')
+                yield scrapy.Request(url=url, callback=self.parse_page)
+        
     def parse_page(self, response):
         time.sleep(5)
         self.logger.error(f'Parsing url {response.url}')
         page_name_and_pagination = response.css('title::text').get() # e.g. Discussion-Dallas | Page 2 | AMPReviews
-        max_pages = response.css('li.pageNav-page:last-child a::text').get()
-        page_url = response.url  
-        page_name = response.css('.p-title-value::text').get()
+
+        thread_max_pages = response.css(
+            'li.pageNav-page:last-child a::text').get(default=1)
+
+        src_category_name = response.css('.p-breadcrumbs li:last-child span::text').get()
+        thread_url = response.url  
+        thread_page_num = response.css('.pageNav-page--current a::text').get(default=1)
+        thread_page_name = response.css('.p-title-value::text').get()
 
         # - get post metadata
         posts = response.css('article.message--post')
         for post in posts: 
             post_id = post.css('::attr(data-content)').get()
-            # NOTE unclosed parenthesis #ERROR:  
-            # cssselect.parser.SelectorSyntaxError: Expected an argument, got <EOF at 18>
-
-            # example link: "/index.php?threads/building-a-list-of-he-only-spots-in-manhattan.129971/post-954437" 
             
             # -- POST STATS
             posted_date_readable = post.css('.message-date time::attr(title)').get()
@@ -102,7 +112,7 @@ class PostSpider(CrawlSpider):
                 
             # --  LIKES
             likers = post.css('div.likesBar a * ::text').getall()
-            num_likers = len(likers) # could be interesting stat
+            num_likers = len(likers) # could be interesting stat # TODO: fix this count
             likers = ' - '.join(likers)
 
             # -- AUTHOR STATS
@@ -121,7 +131,7 @@ class PostSpider(CrawlSpider):
             join_date_readable = post.css('.userTitle time::attr(title)').get()
             join_date_data  = post.css('.userTitle time::attr(data-time)').get()
 
-            self.logger.info(f'Now scraped: {page_name_and_pagination} -- {page_url} -- TotalPages {max_pages}')
+            self.logger.info(f'Now scraped: {page_name_and_pagination} -- {thread_url} -- TotalPages {thread_max_pages}')
 
             # -- YIELD
             # create dictionary to yield
@@ -129,11 +139,14 @@ class PostSpider(CrawlSpider):
 
             fields = '''
                 post_ordinal
-                post_id
                 posted_date_readable
 
+                src_categ_name
+                thread_page_name
+                thread_page_num
+                thread_max_pages
+
                 author
-                author_url
                 author_title 
                 author_num_posts 
                 author_num_reviews
@@ -144,10 +157,14 @@ class PostSpider(CrawlSpider):
                 likers
                 num_likers 
 
+                thread_url
+                post_id
+                posted_date_data 
+
+                author_url
                 join_date_readable
                 join_date_data
 
-                posted_date_data 
                 post_text
                 quoted_contents
             '''.split()
@@ -165,7 +182,8 @@ class PostSpider(CrawlSpider):
             for key in fields:
                 page_data[key] = loc[key] 
 
-            page_data['comment'] = page_name
+            #page_data['comment'] = page_name
+            page_data['comment'] = '' 
             yield page_data
 
         # dirty hack to insert "comment" into bottom of csv file
