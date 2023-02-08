@@ -30,7 +30,7 @@ class PostSpider(CrawlSpider):
 
         #post_url = '/index.php?threads/building-a-list-of-he-only-spots-in-manhattan.129971/' 
         #url = self.base_url + post_url 
-        self.logger.error(f'STarting spider')
+        self.logger.error('Starting spider')
         for category_url in forum_data.link:
             url = self.base_url + category_url
             #self.logger.error(f'now working with url {url}')
@@ -38,7 +38,7 @@ class PostSpider(CrawlSpider):
             yield scrapy.Request(url=url, callback=self.parse_categ_page)
 
     def parse_categ_page(self, response):
-        time.sleep(5)
+        time.sleep(6)
         self.logger.error(f'now parsing category {response.url}')
         for thread in response.css('div.structItem--thread'):
             link = thread.css('div.structItem-title a::attr(href)').get()
