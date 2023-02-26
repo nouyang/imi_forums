@@ -7,23 +7,53 @@ import scrapy
 from scrapy.spiders import CrawlSpider
 from scrapy.crawler import CrawlerProcess
 
+'''
+<td>
+<select name="ctl00$cphMainContent$ddlProfession" id="ctl00_cphMainContent_ddlProfession" tabindex="3" style="width:525px;">
+    <option value="">All</option>
+    <option value="146">Massage Therapist or Bodywork Therapist</option>
+    <option value="46">Massage Therapist Or Bodyworker</option>
+    <option value="47">Massage Therapist-No longer applicable-see #046 </option>
+</select>
+</td>
+'''
 
-class SpidyQuotesViewStateSpider(scrapy.Spider):
-    name = 'spidyquotes-viewstate'
-    start_urls = ['http://quotes.toscrape.com/search.aspx']
-    download_delay = 1.5    
+class DecisionsSpider(scrapy.Spider):
+    name = 'wi-decisions'
+    start_urls = ['https://online.drl.wi.gov/orders/searchorders.aspx']
 
     def parse(self, response):
-        for author in response.css('select#author > option ::attr(value)').extract():
-            yield scrapy.FormRequest(
-                'http://quotes.toscrape.com/filter.aspx',
-                formdata={
-                    'author': author,
-                    '__VIEWSTATE': response.css('input#__VIEWSTATE::attr(value)').extract_first()
-                },
-                callback=self.parse_tags
-            )    
+        print('\n!----')
+	    # "ctl00$cphMainContent$ddlProfession": "146",
+        profession_codes = [146, 46]
+        # [a.attrib['href'] for a in response.css('a')]
+        # text with the dollar signs
+        profession_str = 'ctl00$cphMainContent$ddlProfession'
+        print(response.css('body'))
 
+        for option in response.css('select#ctl00_cphMainContent_ddlProfession > option'):
+            profession_name = option.css("::text").extract_first()
+            profession_value = option.css("::attr(value)").extract_first()
+
+            if 'Massage' in profession_name:
+                self.logger.error(f'{profession_name=}, {profession_value}')
+                yield scrapy.FormRequest.from_response(
+                    response, 
+                    'https://online.drl.wi.gov/orders/searchorders.aspx',
+                    formdata={
+                        profession_str: profession_value,
+                    },
+                    callback=self.parse_results
+            )
+#'table#ctl_phMainContent_gvResults a ::attr(href)'
+
+    def parse_results(self, response):
+        for order in response.css('table#ctl_phMainContent_gvResults tr a ::attr(href)'):
+            print(' \n ! ----')
+
+            #yield {'name': profession_value}
+
+'''
     def parse_tags(self, response):
         for tag in response.css('select#tag > option ::attr(value)').extract():
             yield scrapy.FormRequest.from_response(
@@ -40,6 +70,7 @@ class SpidyQuotesViewStateSpider(scrapy.Spider):
                 'author': response.css('span.author ::text').extract_first(),
                 'tag': response.css('span.tag ::text').extract_first(),
             }
+'''
 
 c = CrawlerProcess(
     settings={
@@ -52,5 +83,5 @@ c = CrawlerProcess(
     }
 )
 
-c.crawl(SpidyQuotesViewStateSpider)
+c.crawl(DecisionsSpider)
 c.start()
